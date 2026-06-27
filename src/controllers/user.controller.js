@@ -4,6 +4,8 @@ import {User} from "../models/user.model.js";
 import {uploadOnCloudinary} from "../utils/cloudinary.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
+import mongoose from "mongoose"
+
 
 //Generate access token and refresh token for the user
 const generateAccessAndRefreshToken = async(userId)=>{
@@ -129,8 +131,8 @@ const loginUser = asyncHandler(async(req, res, next)=>{
 const logoutUser = asyncHandler(async(req, res)=>{
 
     await User.findByIdAndUpdate(req.user._id, {
-        $set: {
-            refreshToken: undefined
+        $unset: {
+            refreshToken: 1 // this removes the field refreshToken from the user document in the database, effectively logging the user out by invalidating the refresh token
         }
     }, {
         new: true
@@ -298,7 +300,7 @@ const getUserChannelProfile = asyncHandler(async(req, res)=>{
 
     const {username} = req.params;
 
-    if(!username){
+    if(!username?.trim()){
         throw new ApiError(400, "Username is required");
     }
 
@@ -313,7 +315,7 @@ const getUserChannelProfile = asyncHandler(async(req, res)=>{
                 from:"subscription",
                 localField: "_id",
                 foreignField:"channel",
-                as:"subscriber"
+                as:"subscribers"
             }
         },
         {
@@ -334,7 +336,7 @@ const getUserChannelProfile = asyncHandler(async(req, res)=>{
                 },
                 isSubscribed:{
                     $cond:{
-                        if: {$in: [req.user?.subscribers.subscriber]},
+                        if: {$in: [req.user?._id, "$subscribers.subscriber"]},
                         then:true,
                         else: false
                     }
@@ -354,7 +356,7 @@ const getUserChannelProfile = asyncHandler(async(req, res)=>{
             }
         }
     ])
-
+   
     if(!channel?.length){
         throw new ApiError(404, "Channel does not exist");
     }
